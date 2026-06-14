@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { CreditCard, AlertCircle, CheckCircle, Calendar, Clock, Loader } from 'lucide-react'
+import { CreditCard, AlertCircle, CheckCircle, Calendar, Clock, Loader, Trash2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 export default function Verify() {
   const [dni, setDni] = useState('')
-  const [status, setStatus] = useState('idle') // idle | loading | found | notfound | error
+  const [status, setStatus] = useState('idle') // idle | loading | found | notfound | error | cancelled
   const [event, setEvent] = useState(null)
   const [attendeeName, setAttendeeName] = useState('')
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -35,6 +37,16 @@ export default function Verify() {
     setStatus('found')
   }
 
+  const handleCancelInscription = async () => {
+    setCancelling(true)
+    const cleanDni = dni.trim().toUpperCase()
+    const { error } = await supabase.from('attendees').delete().eq('dni', cleanDni)
+    setCancelling(false)
+    if (!error) {
+      setStatus('cancelled')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl shadow-xl border border-gray-100 max-w-md w-full overflow-hidden">
@@ -49,7 +61,7 @@ export default function Verify() {
 
         <div className="px-8 py-6">
 
-          {status !== 'found' && (
+          {status !== 'found' && status !== 'cancelled' && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 flex items-center gap-1.5"><CreditCard size={13}/> DNI</label>
@@ -109,6 +121,50 @@ export default function Verify() {
                   ⚠ El horario de este evento ha sido modificado respecto al original.
                 </p>
               )}
+
+              {/* Cancelación de inscripción */}
+              {!confirmCancel ? (
+                <button
+                  onClick={() => setConfirmCancel(true)}
+                  className="w-full flex items-center justify-center gap-2 text-red-500 hover:text-red-600 text-xs font-medium mt-5 py-2 transition-colors"
+                >
+                  <Trash2 size={13}/> Cancelar mi inscripción
+                </button>
+              ) : (
+                <div className="mt-5 bg-red-50 border border-red-200 rounded-xl p-4 text-left">
+                  <p className="text-xs text-red-700 mb-3">
+                    ¿Seguro que quieres cancelar tu inscripción a este evento? Dejarás de recibir notificaciones de cambios de horario.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setConfirmCancel(false)}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 px-3 py-2 rounded-lg transition-all"
+                    >
+                      <X size={13}/> No, mantener
+                    </button>
+                    <button
+                      onClick={handleCancelInscription}
+                      disabled={cancelling}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 disabled:bg-red-300 px-3 py-2 rounded-lg transition-all"
+                    >
+                      {cancelling ? <Loader size={13} className="animate-spin"/> : <Trash2 size={13}/>}
+                      {cancelling ? 'Cancelando...' : 'Sí, cancelar'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {status === 'cancelled' && (
+            <div className="text-center">
+              <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle size={28} className="text-gray-400" />
+              </div>
+              <h2 className="text-base font-bold text-gray-800 mb-1">Inscripción cancelada</h2>
+              <p className="text-sm text-gray-500">
+                Tu inscripción ha sido eliminada. Ya no recibirás notificaciones sobre este evento.
+              </p>
             </div>
           )}
         </div>

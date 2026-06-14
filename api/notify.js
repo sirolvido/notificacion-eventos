@@ -21,7 +21,6 @@ export default async function handler(req, res) {
 
   const { start, end, previousStart, previousEnd } = req.body
 
-  // Obtener todos los inscritos
   const { data: attendees, error } = await supabase
     .from('attendees')
     .select('name, email')
@@ -34,7 +33,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ sent: 0, message: 'No hay inscritos' })
   }
 
-  const verifyUrl = `${req.headers.origin || 'https://eventnotify.vercel.app'}/verify`
+  const verifyUrl = `${req.headers.origin || 'https://notificacion-eventos.vercel.app'}/verify`
 
   let sent = 0
   const errors = []
@@ -75,6 +74,15 @@ export default async function handler(req, res) {
       errors.push({ email: attendee.email, error: err.message })
     }
   }
+
+  // Guardar en historial
+  await supabase.from('event_history').insert({
+    previous_start: previousStart,
+    previous_end: previousEnd,
+    new_start: start,
+    new_end: end,
+    notified_count: sent,
+  })
 
   return res.status(200).json({ sent, total: attendees.length, errors })
 }

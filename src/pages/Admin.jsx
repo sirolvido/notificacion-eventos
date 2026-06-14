@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Lock, Calendar, Clock, Send, CheckCircle, AlertCircle, LogOut, Loader, Users } from 'lucide-react'
+import { Lock, Calendar, Clock, Send, CheckCircle, AlertCircle, LogOut, Loader, Users, History } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
 function toLocalInput(isoString) {
@@ -7,6 +7,11 @@ function toLocalInput(isoString) {
   const d = new Date(isoString)
   const pad = n => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function formatDateTime(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })
 }
 
 export default function Admin() {
@@ -19,22 +24,25 @@ export default function Admin() {
   const [startOverride, setStartOverride] = useState('')
   const [endOverride, setEndOverride] = useState('')
   const [attendeeCount, setAttendeeCount] = useState(0)
+  const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [result, setResult] = useState(null) // {type, message}
+  const [result, setResult] = useState(null)
 
   useEffect(() => {
-    if (authed) loadEvent()
+    if (authed) loadData()
   }, [authed])
 
-  const loadEvent = async () => {
+  const loadData = async () => {
     setLoading(true)
     const { data: eventData } = await supabase.from('event').select('*').eq('id', 1).single()
     const { count } = await supabase.from('attendees').select('*', { count: 'exact', head: true })
+    const { data: historyData } = await supabase.from('event_history').select('*').order('changed_at', { ascending: false }).limit(10)
     setEvent(eventData)
     setStartOverride(toLocalInput(eventData?.start_override || eventData?.start_default))
     setEndOverride(toLocalInput(eventData?.end_override || eventData?.end_default))
     setAttendeeCount(count || 0)
+    setHistory(historyData || [])
     setLoading(false)
   }
 
@@ -78,7 +86,6 @@ export default function Admin() {
     }
 
     if (changed) {
-      // Llamar a la función serverless para enviar notificaciones
       try {
         const res = await fetch('/api/notify', {
           method: 'POST',
@@ -103,7 +110,7 @@ export default function Admin() {
       setResult({ type: 'info', message: 'No se han detectado cambios de horario.' })
     }
 
-    await loadEvent()
+    await loadData()
     setSaving(false)
   }
 
@@ -116,29 +123,16 @@ export default function Admin() {
           </div>
           <h1 className="text-lg font-bold text-gray-800 mb-1">Panel de administración</h1>
           <p className="text-sm text-gray-500 mb-6">EventNotify · Acceso restringido</p>
-
           <div className="space-y-3">
-            <input
-              type="text" placeholder="Usuario" value={user}
-              onChange={e => setUser(e.target.value)}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-            <input
-              type="password" placeholder="Contraseña" value={pass}
-              onChange={e => setPass(e.target.value)}
-              className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            />
+            <input type="text" placeholder="Usuario" value={user} onChange={e => setUser(e.target.value)} className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <input type="password" placeholder="Contraseña" value={pass} onChange={e => setPass(e.target.value)} className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
-
           {loginError && (
             <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-1.5 mt-3">
               <AlertCircle size={13}/> {loginError}
             </div>
           )}
-
-          <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2.5 rounded-lg transition-all mt-4">
-            Entrar
-          </button>
+          <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2.5 rounded-lg transition-all mt-4">Entrar</button>
         </form>
       </div>
     )
@@ -146,9 +140,9 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-2xl mx-auto space-y-4">
 
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-gray-800">Panel de administración</h1>
             <p className="text-sm text-gray-500 mt-0.5">Gestión de horario del evento</p>
@@ -160,60 +154,48 @@ export default function Admin() {
 
         {loading ? (
           <div className="flex items-center gap-2 text-gray-400 text-sm py-12 justify-center">
-            <Loader size={16} className="animate-spin"/> Cargando evento...
+            <Loader size={16} className="animate-spin"/> Cargando...
           </div>
         ) : (
           <>
             {/* Info del evento */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-4">
-              <div className="flex items-center gap-2 mb-1">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-center gap-2 mb-2">
                 <Calendar size={16} className="text-indigo-500"/>
                 <span className="font-semibold text-gray-800">{event.name}</span>
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-2">
+              <div className="flex items-center gap-1.5 text-xs text-gray-500">
                 <Users size={13}/> {attendeeCount} personas inscritas
               </div>
             </div>
 
-            {/* Horarios predeterminados */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-4">
+            {/* Horario predeterminado */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Horario predeterminado (fijo)</div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-gray-500 mb-1 flex items-center gap-1.5"><Clock size={12}/> Inicio</label>
-                  <div className="text-sm font-medium text-gray-700 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
-                    {new Date(event.start_default).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
-                  </div>
+                  <div className="text-sm font-medium text-gray-700 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">{formatDateTime(event.start_default)}</div>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 mb-1 flex items-center gap-1.5"><Clock size={12}/> Fin</label>
-                  <div className="text-sm font-medium text-gray-700 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
-                    {new Date(event.end_default).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}
-                  </div>
+                  <div className="text-sm font-medium text-gray-700 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">{formatDateTime(event.end_default)}</div>
                 </div>
               </div>
             </div>
 
-            {/* Horarios actuales / overrides */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 mb-4">
+            {/* Horario actual editable */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
               <div className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Horario actual del evento</div>
               <p className="text-xs text-gray-400 mb-3">Si modificas estos campos y guardas, se notificará a todos los inscritos por email.</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-gray-600 mb-1 flex items-center gap-1.5"><Clock size={12}/> Nuevo inicio</label>
-                  <input
-                    type="datetime-local" value={startOverride}
-                    onChange={e => setStartOverride(e.target.value)}
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <input type="datetime-local" value={startOverride} onChange={e => setStartOverride(e.target.value)} className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-600 mb-1 flex items-center gap-1.5"><Clock size={12}/> Nuevo fin</label>
-                  <input
-                    type="datetime-local" value={endOverride}
-                    onChange={e => setEndOverride(e.target.value)}
-                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
+                  <input type="datetime-local" value={endOverride} onChange={e => setEndOverride(e.target.value)} className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                 </div>
               </div>
 
@@ -243,6 +225,38 @@ export default function Admin() {
                 {saving ? <Loader size={15} className="animate-spin"/> : <Send size={15}/>}
                 {saving ? 'Guardando y notificando...' : 'Guardar y notificar'}
               </button>
+            </div>
+
+            {/* Historial de cambios */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <History size={16} className="text-indigo-500"/>
+                <span className="text-sm font-semibold text-gray-700">Historial de cambios</span>
+              </div>
+
+              {history.length === 0 ? (
+                <p className="text-xs text-gray-400 py-2">No hay cambios registrados todavía.</p>
+              ) : (
+                <div className="space-y-3">
+                  {history.map((h, i) => (
+                    <div key={h.id} className="flex items-start gap-3 pb-3 border-b border-gray-50 last:border-0">
+                      <div className="w-7 h-7 bg-indigo-50 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Clock size={13} className="text-indigo-400"/>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs text-gray-400 mb-1">{new Date(h.changed_at).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</div>
+                        <div className="text-xs text-gray-500">
+                          <span className="line-through">{formatDateTime(h.previous_start)} — {formatDateTime(h.previous_end)}</span>
+                        </div>
+                        <div className="text-xs font-medium text-gray-700">{formatDateTime(h.new_start)} — {formatDateTime(h.new_end)}</div>
+                      </div>
+                      <div className="text-xs text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full flex-shrink-0">
+                        {h.notified_count} notif.
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}

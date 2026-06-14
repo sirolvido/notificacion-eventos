@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 
 export default function Verify() {
   const [dni, setDni] = useState('')
-  const [status, setStatus] = useState('idle') // idle | loading | found | notfound | error | cancelled
+  const [status, setStatus] = useState('idle')
   const [event, setEvent] = useState(null)
   const [attendeeName, setAttendeeName] = useState('')
   const [confirmCancel, setConfirmCancel] = useState(false)
@@ -13,22 +13,18 @@ export default function Verify() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     const cleanDni = dni.trim().toUpperCase()
-    if (!/^[0-9]{8}[A-Z]$/.test(cleanDni)) {
-      setStatus('error')
-      return
-    }
+    if (!/^[0-9]{8}[A-Z]$/.test(cleanDni)) { setStatus('error'); return }
     setStatus('loading')
 
-    const { data: attendee, error: attendeeError } = await supabase
-      .from('attendees')
-      .select('name')
-      .eq('dni', cleanDni)
-      .maybeSingle()
+    const { data: attendee } = await supabase
+      .from('attendees').select('name').eq('dni', cleanDni).maybeSingle()
 
-    if (attendeeError || !attendee) {
-      setStatus('notfound')
-      return
-    }
+    if (!attendee) { setStatus('notfound'); return }
+
+    // Marcar como verificado
+    await supabase.from('attendees')
+      .update({ verified_at: new Date().toISOString() })
+      .eq('dni', cleanDni)
 
     const { data: eventData } = await supabase.from('event').select('*').eq('id', 1).single()
 
@@ -42,9 +38,7 @@ export default function Verify() {
     const cleanDni = dni.trim().toUpperCase()
     const { error } = await supabase.from('attendees').delete().eq('dni', cleanDni)
     setCancelling(false)
-    if (!error) {
-      setStatus('cancelled')
-    }
+    if (!error) setStatus('cancelled')
   }
 
   return (
@@ -60,36 +54,17 @@ export default function Verify() {
         </div>
 
         <div className="px-8 py-6">
-
           {status !== 'found' && status !== 'cancelled' && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="text-xs font-medium text-gray-600 mb-1 flex items-center gap-1.5"><CreditCard size={13}/> DNI</label>
-                <input
-                  type="text" value={dni}
-                  onChange={e => setDni(e.target.value)}
-                  placeholder="12345678A"
-                  maxLength={9}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+                <input type="text" value={dni} onChange={e => setDni(e.target.value)} placeholder="12345678A" maxLength={9}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
               </div>
-
-              {status === 'error' && (
-                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
-                  <AlertCircle size={13}/> Formato de DNI no válido (8 números + letra).
-                </div>
-              )}
-              {status === 'notfound' && (
-                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
-                  <AlertCircle size={13}/> No encontramos ninguna inscripción con ese DNI.
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={status === 'loading'}
-                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white text-sm font-medium py-2.5 rounded-lg transition-all"
-              >
+              {status === 'error' && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-1.5"><AlertCircle size={13}/> Formato de DNI no válido (8 números + letra).</div>}
+              {status === 'notfound' && <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-1.5"><AlertCircle size={13}/> No encontramos ninguna inscripción con ese DNI.</div>}
+              <button type="submit" disabled={status === 'loading'}
+                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white text-sm font-medium py-2.5 rounded-lg transition-all">
                 {status === 'loading' ? <Loader size={15} className="animate-spin"/> : null}
                 {status === 'loading' ? 'Verificando...' : 'Verificar'}
               </button>
@@ -122,31 +97,21 @@ export default function Verify() {
                 </p>
               )}
 
-              {/* Cancelación de inscripción */}
               {!confirmCancel ? (
-                <button
-                  onClick={() => setConfirmCancel(true)}
-                  className="w-full flex items-center justify-center gap-2 text-red-500 hover:text-red-600 text-xs font-medium mt-5 py-2 transition-colors"
-                >
+                <button onClick={() => setConfirmCancel(true)}
+                  className="w-full flex items-center justify-center gap-2 text-red-500 hover:text-red-600 text-xs font-medium mt-5 py-2 transition-colors">
                   <Trash2 size={13}/> Cancelar mi inscripción
                 </button>
               ) : (
                 <div className="mt-5 bg-red-50 border border-red-200 rounded-xl p-4 text-left">
-                  <p className="text-xs text-red-700 mb-3">
-                    ¿Seguro que quieres cancelar tu inscripción a este evento? Dejarás de recibir notificaciones de cambios de horario.
-                  </p>
+                  <p className="text-xs text-red-700 mb-3">¿Seguro que quieres cancelar tu inscripción? Dejarás de recibir notificaciones.</p>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setConfirmCancel(false)}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 px-3 py-2 rounded-lg transition-all"
-                    >
+                    <button onClick={() => setConfirmCancel(false)}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 px-3 py-2 rounded-lg transition-all">
                       <X size={13}/> No, mantener
                     </button>
-                    <button
-                      onClick={handleCancelInscription}
-                      disabled={cancelling}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 disabled:bg-red-300 px-3 py-2 rounded-lg transition-all"
-                    >
+                    <button onClick={handleCancelInscription} disabled={cancelling}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs font-medium text-white bg-red-500 hover:bg-red-600 disabled:bg-red-300 px-3 py-2 rounded-lg transition-all">
                       {cancelling ? <Loader size={13} className="animate-spin"/> : <Trash2 size={13}/>}
                       {cancelling ? 'Cancelando...' : 'Sí, cancelar'}
                     </button>
@@ -162,9 +127,7 @@ export default function Verify() {
                 <CheckCircle size={28} className="text-gray-400" />
               </div>
               <h2 className="text-base font-bold text-gray-800 mb-1">Inscripción cancelada</h2>
-              <p className="text-sm text-gray-500">
-                Tu inscripción ha sido eliminada. Ya no recibirás notificaciones sobre este evento.
-              </p>
+              <p className="text-sm text-gray-500">Tu inscripción ha sido eliminada. Ya no recibirás notificaciones sobre este evento.</p>
             </div>
           )}
         </div>

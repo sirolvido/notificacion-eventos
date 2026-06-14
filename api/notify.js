@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import twilio from 'twilio'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -7,6 +8,11 @@ const supabase = createClient(
 )
 
 const resend = new Resend(process.env.RESEND_API_KEY)
+
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+)
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString('es-ES', {
@@ -23,22 +29,18 @@ export default async function handler(req, res) {
 
   const { data: attendees, error } = await supabase
     .from('attendees')
-    .select('name, email')
+    .select('name, email, phone')
 
-  if (error) {
-    return res.status(500).json({ error: 'Error al obtener inscritos' })
-  }
-
-  if (!attendees || attendees.length === 0) {
-    return res.status(200).json({ sent: 0, message: 'No hay inscritos' })
-  }
+  if (error) return res.status(500).json({ error: 'Error al obtener inscritos' })
+  if (!attendees || attendees.length === 0) return res.status(200).json({ sent: 0, message: 'No hay inscritos' })
 
   const verifyUrl = `${req.headers.origin || 'https://notificacion-eventos.vercel.app'}/verify`
 
-  let sent = 0
-  const errors = []
+  let emailSent = 0
+  let whatsappSent = 0
 
   for (const attendee of attendees) {
+    // Email
     try {
       await resend.emails.send({
         from: 'EventNotify <onboarding@resend.dev>',
@@ -52,26 +54,33 @@ export default async function handler(req, res) {
             </div>
             <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
               <p style="margin: 0 0 4px 0; font-size: 13px; color: #6b7280;">Horario anterior:</p>
-              <p style="margin: 0 0 12px 0; font-size: 14px; color: #374151; text-decoration: line-through;">
-                ${formatDate(previousStart)} — ${formatDate(previousEnd)}
-              </p>
+              <p style="margin: 0 0 12px 0; font-size: 14px; color: #374151; text-decoration: line-through;">${formatDate(previousStart)} — ${formatDate(previousEnd)}</p>
               <p style="margin: 0 0 4px 0; font-size: 13px; color: #6b7280;">Nuevo horario:</p>
-              <p style="margin: 0; font-size: 14px; color: #111827; font-weight: 600;">
-                ${formatDate(start)} — ${formatDate(end)}
-              </p>
+              <p style="margin: 0; font-size: 14px; color: #111827; font-weight: 600;">${formatDate(start)} — ${formatDate(end)}</p>
             </div>
-            <a href="${verifyUrl}" style="display: inline-block; background: #4f46e5; color: white; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500;">
-              Verificar mi inscripción
-            </a>
-            <p style="font-size: 12px; color: #9ca3af; margin-top: 16px;">
-              Para confirmar tu inscripción con el nuevo horario, accede al enlace e introduce tu DNI.
-            </p>
+            <a href="${verifyUrl}" style="display: inline-block; background: #4f46e5; color: white; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500;">Verificar mi inscripción</a>
+            <p style="font-size: 12px; color: #9ca3af; margin-top: 16px;">Introduce tu DNI en el enlace para confirmar el nuevo horario.</p>
           </div>
         `,
       })
-      sent++
+      emailSent++
     } catch (err) {
-      errors.push({ email: attendee.email, error: err.message })
+      console.error('Email error:', err.message)
+    }
+
+    // WhatsApp (solo si tiene teléfono)
+    if (attendee.phone) {
+      try {
+        const phoneClean = attendee.phone.replace(/\s/g, '')
+        await twilioClient.messages.create({
+          from: process.env.TWILIO_WHATSAPP_FROM,
+          to: `whatsapp:${phoneClean}`,
+          body: `⚠️ Hola ${attendee.name.split(' ')[0]}, el horario de tu evento ha cambiado.\n\n🕐 Antes: ${formatDate(previousStart)}\n🕐 Ahora: ${formatDate(start)}\n\nVerifica tu inscripción aquí: ${verifyUrl}`,
+        })
+        whatsappSent++
+      } catch (err) {
+        console.error('WhatsApp error:', err.message)
+      }
     }
   }
 
@@ -81,8 +90,8 @@ export default async function handler(req, res) {
     previous_end: previousEnd,
     new_start: start,
     new_end: end,
-    notified_count: sent,
+    notified_count: emailSent,
   })
 
-  return res.status(200).json({ sent, total: attendees.length, errors })
+  return res.status(200).json({ sent: emailSent, whatsappSent, total: attendees.length })
 }

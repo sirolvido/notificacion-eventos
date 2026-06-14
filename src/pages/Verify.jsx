@@ -127,7 +127,10 @@ export default function Verify() {
                 <CheckCircle size={28} className="text-gray-400" />
               </div>
               <h2 className="text-base font-bold text-gray-800 mb-1">Inscripción cancelada</h2>
-              <p className="text-sm text-gray-500">Tu inscripción ha sido eliminada. Ya no recibirás notificaciones sobre este evento.</p>
+              <p className="text-sm text-gray-500 mb-5">Tu inscripción ha sido eliminada. Ya no recibirás notificaciones sobre este evento.</p>
+              <a href="/" className="inline-flex items-center justify-center w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2.5 rounded-lg transition-all">
+                Volver al inicio
+              </a>
             </div>
           )}
         </div>

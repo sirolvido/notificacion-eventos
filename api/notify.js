@@ -70,18 +70,20 @@ export default async function handler(req, res) {
 
     // WhatsApp (solo si tiene teléfono)
     if (attendee.phone) {
-      try {
-        const phoneClean = attendee.phone.replace(/\s/g, '')
-        await twilioClient.messages.create({
-          from: process.env.TWILIO_WHATSAPP_FROM,
-          to: `whatsapp:${phoneClean}`,
-          body: `⚠️ Hola ${attendee.name.split(' ')[0]}, el horario de tu evento ha cambiado.\n\n🕐 Antes: ${formatDate(previousStart)}\n🕐 Ahora: ${formatDate(start)}\n\nVerifica tu inscripción aquí: ${verifyUrl}`,
-        })
-        whatsappSent++
-      } catch (err) {
-        console.error('WhatsApp error:', err.message)
-      }
-    }
+  try {
+    const phoneClean = attendee.phone.replace(/\s/g, '')
+    console.log('Enviando WhatsApp a:', phoneClean)
+    const msg = await twilioClient.messages.create({
+      from: process.env.TWILIO_WHATSAPP_FROM,
+      to: `whatsapp:${phoneClean}`,
+      body: `⚠️ Hola ${attendee.name.split(' ')[0]}, el horario de tu evento ha cambiado.\n\nVerifica aquí: ${verifyUrl}`,
+    })
+    console.log('WhatsApp enviado, SID:', msg.sid)
+    whatsappSent++
+  } catch (err) {
+    console.error('WhatsApp error:', err.message)
+  }
+}
   }
 
   // Guardar en historial

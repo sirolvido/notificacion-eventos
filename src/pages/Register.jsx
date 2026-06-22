@@ -48,7 +48,6 @@ export default function Register() {
       className="min-h-screen flex items-center justify-center p-6 relative"
       style={{ backgroundImage: `url(${conferenceBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
     >
-      {/* Overlay oscuro */}
       <div className="absolute inset-0 bg-black/55"></div>
 
       {status === 'success' ? (
@@ -57,14 +56,19 @@ export default function Register() {
             <CheckCircle size={28} className="text-green-500" />
           </div>
           <h1 className="text-xl font-bold text-gray-800 mb-2">¡Inscripción confirmada!</h1>
-          <p className="text-sm text-gray-500 leading-relaxed">
+          <p className="text-sm text-gray-500 leading-relaxed mb-6">
             Te hemos registrado para el evento. Si hay algún cambio de horario, te avisaremos por email y WhatsApp
             con un enlace para verificar tu inscripción mediante tu DNI.
           </p>
+          <a
+            href="/verify"
+            style={{ backgroundColor: '#4f46e5', color: 'white', display: 'block', textAlign: 'center', padding: '10px 24px', borderRadius: '8px', fontWeight: '600', fontSize: '14px', textDecoration: 'none' }}
+          >
+            Verificar mi inscripción →
+          </a>
         </div>
       ) : (
         <div className="relative z-10 bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
-
           <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-10 py-8 text-white">
             <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-3">
               <Calendar size={20} />

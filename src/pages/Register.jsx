@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Calendar, User, Mail, Phone, CreditCard, CheckCircle, AlertCircle } from 'lucide-react'
+import { Calendar, User, Mail, Phone, CreditCard, CheckCircle, AlertCircle, Share2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import conferenceBg from '../assets/conference.jpg'
 
@@ -7,6 +7,22 @@ export default function Register() {
   const [form, setForm] = useState({ name: '', dni: '', email: '', phone: '' })
   const [status, setStatus] = useState('idle')
   const [errors, setErrors] = useState({})
+  const [copied, setCopied] = useState(false)
+
+  const shareUrl = 'https://notificacion-eventos.vercel.app'
+  const shareText = 'Me he inscrito a la Conferencia Anual 2026. ¡Apúntate tú también!'
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Conferencia Anual 2026', text: shareText, url: shareUrl })
+      } catch (err) {}
+    } else {
+      await navigator.clipboard.writeText(`${shareText} ${shareUrl}`)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
 
   const validate = () => {
     const e = {}
@@ -60,12 +76,13 @@ export default function Register() {
             Te hemos registrado para el evento. Si hay algún cambio de horario, te avisaremos por email y WhatsApp
             con un enlace para verificar tu inscripción mediante tu DNI.
           </p>
-          <a
-            href="/verify"
-            style={{ backgroundColor: '#4f46e5', color: 'white', display: 'block', textAlign: 'center', padding: '10px 24px', borderRadius: '8px', fontWeight: '600', fontSize: '14px', textDecoration: 'none' }}
+          <button
+            onClick={handleShare}
+            style={{ backgroundColor: '#4f46e5', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '10px 24px', borderRadius: '8px', fontWeight: '600', fontSize: '14px', border: 'none', cursor: 'pointer' }}
           >
-            Verificar mi inscripción →
-          </a>
+            <Share2 size={16} />
+            {copied ? '¡Enlace copiado!' : 'Compartir el evento'}
+          </button>
         </div>
       ) : (
         <div className="relative z-10 bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">

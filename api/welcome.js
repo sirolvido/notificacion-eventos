@@ -19,9 +19,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Missing name or email' })
   }
 
-  // Log para diagnóstico
   console.log('Procesando bienvenida para:', name, email)
-  console.log('API Key presente:', !!process.env.ANTHROPIC_API_KEY)
 
   // Leer plantilla
   let template = ''
@@ -31,54 +29,78 @@ export default async function handler(req, res) {
     console.log('Plantilla leída, longitud:', template.length)
   } catch (err) {
     console.error('Error leyendo plantilla:', err.message)
-    template = 'Genera un email de bienvenida profesional y amigable.'
+    template = 'Genera un email de bienvenida profesional y amigable con colores índigo y púrpura.'
   }
 
-  // Llamar a Claude
+  // Llamar a OpenRouter
   let emailHtml = ''
   try {
-    const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${process.env.VITE_OPENROUTER_API_KEY}`,
+        'HTTP-Referer': 'https://notificacion-eventos.vercel.app',
+        'X-Title': 'EventNotify',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
+        model: 'google/gemma-3-27b-it:free',
+        max_tokens: 1500,
         messages: [
           {
             role: 'user',
-            content: `Eres un generador de emails HTML. Genera un email de bienvenida para ${name} (${email}) para la Conferencia Anual 2026 el 20 de junio de 10:00 a 16:00. Usa colores índigo y púrpura. Devuelve SOLO el HTML, sin explicaciones.`,
+            content: `Eres un generador de emails HTML para EventNotify. Sigue esta guía de diseño al pie de la letra:
+
+${template}
+
+Genera el email de bienvenida para este usuario:
+- Nombre completo: ${name}
+- Email: ${email}
+
+IMPORTANTE: Devuelve ÚNICAMENTE el HTML con estilos inline. Sin explicaciones. Sin bloques de código markdown. Empieza directamente con <div.`,
           },
         ],
       }),
     })
 
-    console.log('Status Claude:', claudeResponse.status)
-    const claudeData = await claudeResponse.json()
-    console.log('Respuesta Claude keys:', Object.keys(claudeData))
+    console.log('Status OpenRouter:', response.status)
+    const data = await response.json()
 
-    if (claudeData.error) {
-      console.error('Error Claude:', claudeData.error)
-      throw new Error(claudeData.error.message)
+    if (data.error) {
+      console.error('Error OpenRouter:', data.error)
+      throw new Error(data.error.message)
     }
 
-    emailHtml = claudeData.content?.[0]?.text || ''
+    emailHtml = data.choices?.[0]?.message?.content || ''
+    // Limpiar posibles bloques de código markdown
+    emailHtml = emailHtml.replace(/```html|```/g, '').trim()
     console.log('HTML generado, longitud:', emailHtml.length)
 
   } catch (err) {
-    console.error('Error llamando a Claude:', err.message)
-    // Fallback: email simple sin IA
+    console.error('Error llamando a OpenRouter:', err.message)
+    // Fallback: email simple
     emailHtml = `
-      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-        <div style="background: linear-gradient(135deg, #6366f1, #9333ea); border-radius: 12px; padding: 24px; color: white; margin-bottom: 16px;">
-          <h2 style="margin: 0 0 8px 0;">¡Bienvenido, ${name.split(' ')[0]}!</h2>
-          <p style="margin: 0; opacity: 0.9;">Tu inscripción a la Conferencia Anual 2026 está confirmada.</p>
+      <div style="font-family: -apple-system, sans-serif; max-width: 540px; margin: 0 auto; background: #f9fafb; padding: 24px;">
+        <div style="border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.07);">
+          <img src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=540&q=80" style="width:100%;max-height:200px;object-fit:cover;display:block;" alt="Conferencia Anual 2026">
+          <div style="background: linear-gradient(135deg, #6366f1, #9333ea); padding: 28px 32px; color: white;">
+            <p style="margin: 0 0 4px 0; font-size: 13px; opacity: 0.85;">📅 Conferencia Anual 2026</p>
+            <h2 style="margin: 0; font-size: 22px;">¡Hola, ${name.split(' ')[0]}! 👋</h2>
+          </div>
+          <div style="background: white; padding: 32px;">
+            <p style="color: #374151; font-size: 15px; margin: 0 0 20px 0;">Tu inscripción está confirmada. Te esperamos el 20 de junio.</p>
+            <div style="background: #eef2ff; border-left: 3px solid #6366f1; border-radius: 8px; padding: 16px; margin-bottom: 20px; font-size: 14px; color: #374151; line-height: 1.8;">
+              📅 <strong>Fecha:</strong> 20 de junio de 2026<br>
+              🕐 <strong>Horario:</strong> 10:00 - 16:00h<br>
+              📍 <strong>Modalidad:</strong> Presencial
+            </div>
+            <p style="color: #6b7280; font-size: 14px; margin: 0 0 20px 0;">Si hay algún cambio de horario, te notificaremos por email y WhatsApp.</p>
+            <a href="https://notificacion-eventos.vercel.app/verify" style="display:inline-block;background:#6366f1;color:white;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px;">Verificar mi inscripción →</a>
+            <div style="border-top: 1px solid #e5e7eb; margin-top: 28px; padding-top: 20px;">
+              <p style="font-size: 12px; color: #9ca3af; margin: 0; line-height: 1.6;">Puedes cancelar tu inscripción en cualquier momento desde el enlace de verificación.<br>EventNotify © 2026</p>
+            </div>
+          </div>
         </div>
-        <p style="color: #374151;">El evento se celebra el <strong>20 de junio de 2026, de 10:00 a 16:00</strong>.</p>
-        <p style="color: #374151;">Si hay algún cambio de horario, te notificaremos por email y WhatsApp.</p>
       </div>
     `
   }

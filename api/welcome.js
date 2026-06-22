@@ -33,6 +33,7 @@ export default async function handler(req, res) {
   // Llamar a Claude para generar el email personalizado
   let emailHtml = ''
   try {
+    console.log('API Key presente:', !!process.env.ANTHROPIC_API_KEY)
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {

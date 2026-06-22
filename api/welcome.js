@@ -34,6 +34,7 @@ export default async function handler(req, res) {
   let emailHtml = ''
   try {
     console.log('API Key presente:', !!process.env.ANTHROPIC_API_KEY)
+    console.log('API Key primeros chars:', process.env.ANTHROPIC_API_KEY?.substring(0, 10))
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {

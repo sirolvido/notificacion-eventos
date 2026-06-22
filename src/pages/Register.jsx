@@ -24,6 +24,16 @@ export default function Register() {
     }
   }
 
+  const handleAddToCalendar = () => {
+    const startDate = '20260620T100000'
+    const endDate = '20260620T160000'
+    const title = encodeURIComponent('Conferencia Anual 2026')
+    const details = encodeURIComponent('Inscripción confirmada. Verifica tu inscripción en: https://notificacion-eventos.vercel.app/verify')
+    const location = encodeURIComponent('Madrid, España')
+    const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${startDate}/${endDate}&details=${details}&location=${location}`
+    window.open(url, '_blank')
+  }
+
   const validate = () => {
     const e = {}
     if (!form.name.trim()) e.name = 'Introduce tu nombre completo'
@@ -76,13 +86,22 @@ export default function Register() {
             Te hemos registrado para el evento. Si hay algún cambio de horario, te avisaremos por email y WhatsApp
             con un enlace para verificar tu inscripción mediante tu DNI.
           </p>
-          <button
-            onClick={handleShare}
-            style={{ backgroundColor: '#4f46e5', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%', padding: '10px 24px', borderRadius: '8px', fontWeight: '600', fontSize: '14px', border: 'none', cursor: 'pointer' }}
-          >
-            <Share2 size={16} />
-            {copied ? '¡Enlace copiado!' : 'Compartir el evento'}
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleAddToCalendar}
+              style={{ flex: 1, backgroundColor: '#ffffff', color: '#4f46e5', border: '2px solid #4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 16px', borderRadius: '8px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}
+            >
+              <Calendar size={15} />
+              Google Calendar
+            </button>
+            <button
+              onClick={handleShare}
+              style={{ flex: 1, backgroundColor: '#4f46e5', color: 'white', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px 16px', borderRadius: '8px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}
+            >
+              <Share2 size={15} />
+              {copied ? '¡Copiado!' : 'Compartir'}
+            </button>
+          </div>
         </div>
       ) : (
         <div className="relative z-10 bg-white rounded-2xl shadow-2xl max-w-2xl w-full overflow-hidden">
